@@ -11,6 +11,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { card_uid, reader_id, lat, lng } = body;
+    console.log(card_uid, reader_id, lat, lng);
 
     if (!card_uid || !reader_id) {
       return NextResponse.json(
