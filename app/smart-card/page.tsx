@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Added useEffect
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,7 +10,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
+// Removed Spinner, will use Loader2 from lucide-react
 import {
   CreditCard,
   Check,
@@ -23,8 +23,10 @@ import {
   Wallet,
   ArrowUp,
   ArrowDown,
+  Loader2, // Added Loader2
 } from "lucide-react";
 
+// (Keep your Transaction interface and mock data here)
 interface Transaction {
   id: string;
   type: "ride" | "recharge";
@@ -40,45 +42,63 @@ export default function SmartCardPage() {
   >("intro");
   const [cardUID, setCardUID] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [linkedCard, setLinkedCard] = useState<string | null>("B3:9E:38:F6");
-  const [cardBalance, setCardBalance] = useState(312.5);
-  const [rechargeAmount, setRechargeAmount] = useState("");
+
+  // --- REAL DATA ---
+  // We'll fetch the user's real card and balance
+  const [linkedCard, setLinkedCard] = useState<string | null>(null);
+  const [cardBalance, setCardBalance] = useState(0);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Page load spinner
   const [status, setStatus] = useState("");
 
-  const [transactions] = useState<Transaction[]>([
-    {
-      id: "1",
-      type: "ride",
-      amount: -45.5,
-      description: "Bus Route #12 - Downtown",
-      date: "Oct 25",
-      time: "09:30 AM",
+  const [transactions] = useState<Transaction[]>([{
+    id: "1",
+    type: "ride",
+    amount: -45.5,
+    description: "Bus Route #12 - Downtown",
+    date: "Oct 25",
+    time: "09:30 AM",
+  },
+  {
+    id: "2",
+    type: "recharge",
+    amount: 500,
+    description: "Card Recharge",
+    date: "Oct 24",
+    time: "02:15 PM",
+  },
+  {
+    id: "3",
+    type: "ride",
+    amount: -32.0,
+    description: "Bus Route #5 - Airport",
+    date: "Oct 23",
+    time: "06:45 PM",
+  },
+  {
+    id: "4",
+    type: "ride",
+    amount: -28.75,
+    description: "Bus Route #8 - Station",
+    date: "Oct 22",
+    time: "08:20 AM",
     },
-    {
-      id: "2",
-      type: "recharge",
-      amount: 500,
-      description: "Card Recharge",
-      date: "Oct 24",
-      time: "02:15 PM",
-    },
-    {
-      id: "3",
-      type: "ride",
-      amount: -32.0,
-      description: "Bus Route #5 - Airport",
-      date: "Oct 23",
-      time: "06:45 PM",
-    },
-    {
-      id: "4",
-      type: "ride",
-      amount: -28.75,
-      description: "Bus Route #8 - Station",
-      date: "Oct 22",
-      time: "08:20 AM",
-    },
-  ]);
+  ]); // You would fetch this too
+  const [rechargeAmount, setRechargeAmount] = useState(""); // Added this line
+
+  // --- FETCH USER DATA ON LOAD ---
+  // This simulates fetching the user's current card & balance
+  useEffect(() => {
+    const fetchUserData = async () => {
+      setIsPageLoading(true);
+      // TODO: Replace this with a real fetch to your user/profile API
+      // For now, we mock it.
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      setLinkedCard("B3:9E:38:F6"); // Mock: user already has a card
+      setCardBalance(312.5);
+      setIsPageLoading(false);
+    };
+    fetchUserData();
+  }, []);
 
   const startCardDetection = async () => {
     setStatus("Waiting... Please tap your card on the reader.");
@@ -86,6 +106,7 @@ export default function SmartCardPage() {
     setIsLoading(true);
 
     try {
+      // This API call is now fixed and will return a clean UID
       const response = await fetch("/api/card/detect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -100,8 +121,8 @@ export default function SmartCardPage() {
       }
 
       const data = await response.json();
-      setCardUID(data.cardUID);
-      setStatus(`Card ${data.cardUID} detected! Verifying...`);
+      setCardUID(data.cardUID); // This will be the clean UID
+      setStatus(`Card ${data.cardUID} detected! Please verify.`);
       setIsLoading(false);
       setStep("verify");
     } catch (error) {
@@ -112,42 +133,64 @@ export default function SmartCardPage() {
     }
   };
 
+  // --- !!! THIS FUNCTION IS NOW FIXED !!! ---
   const handleConfirmLink = async () => {
     setIsLoading(true);
     setStatus("Linking card to your account...");
 
     try {
-      // Simulate API call to register card
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setLinkedCard(cardUID);
-      setStatus(`Success! Card ${cardUID} is now linked.`);
+      // This is the REAL API call to your /api/register-card route
+      const response = await fetch("/api/register-card", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_uid: cardUID }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Show the user the error from the server (e.g., "Card already registered")
+        throw new Error(data.error || "Failed to link card");
+      }
+
+      // Success!
+      setLinkedCard(data.card_uid);
+      setStatus(`Success! Card ${data.card_uid} is now linked.`);
       setStep("success");
+
       setTimeout(() => {
         setStep("intro");
         setCardUID("");
         setStatus("");
       }, 3000);
-    } catch (error) {
-      setStatus("Error linking card. Please try again.");
+    } catch (error: any) {
+      console.error("Card linking error:", error.message);
+      setStatus(`Error: ${error.message}`);
       setIsLoading(false);
+      // Don't reset step, let them see the error and retry
     }
   };
 
   const handleRecharge = async () => {
+    // (Your recharge logic here - this is still simulated)
     if (!rechargeAmount || Number.parseFloat(rechargeAmount) <= 0) return;
-
     setIsLoading(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      const amount = Number.parseFloat(rechargeAmount);
-      setCardBalance(cardBalance + amount);
-      setRechargeAmount("");
-      setStep("intro");
-      setIsLoading(false);
-    } catch (error) {
-      setIsLoading(false);
-    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const amount = Number.parseFloat(rechargeAmount);
+    setCardBalance(cardBalance + amount);
+    setRechargeAmount("");
+    setStep("intro");
+    setIsLoading(false);
   };
+
+  // Show a spinner while the page is loading the user's data
+  if (isPageLoading) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -230,11 +273,11 @@ export default function SmartCardPage() {
                       </p>
                     </div>
                     {/* <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <Check className="w-5 h-5 text-green-500" />
-                      <p className="text-sm text-green-700 dark:text-green-400">
-                        Card successfully linked and active
-                      </p>
-                    </div> */}
+                      <Check className="w-5 h-5 text-green-500" />
+                      <p className="text-sm text-green-700 dark:text-green-400">
+                        Card successfully linked and active
+                      </p>
+                  . */}
                     <Button
                       onClick={startCardDetection}
                       variant="outline"
@@ -364,7 +407,7 @@ export default function SmartCardPage() {
           <CardContent className="space-y-6">
             <div className="p-8 bg-muted rounded-lg border border-border text-center space-y-4">
               <div className="flex justify-center">
-                <Spinner className="w-12 h-12 text-primary" />
+                <Loader2 className="w-12 h-12 text-primary animate-spin" />
               </div>
               <div>
                 <p className="font-semibold text-card-foreground">
@@ -454,7 +497,7 @@ export default function SmartCardPage() {
               >
                 {isLoading ? (
                   <>
-                    <Spinner className="w-4 h-4" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Linking...
                   </>
                 ) : (
@@ -569,7 +612,7 @@ export default function SmartCardPage() {
               >
                 {isLoading ? (
                   <>
-                    <Spinner className="w-4 h-4" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Processing...
                   </>
                 ) : (
