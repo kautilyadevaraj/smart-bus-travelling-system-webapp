@@ -28,11 +28,14 @@ export async function POST(request: Request) {
 
   // 1. Remove the null byte (0x00) that causes the 'invalid byte sequence' error.
   const cleaned_string = garbled_uid.replace(/\0/g, "");
+  console.log("Cleaned UID string:", cleaned_string);
 
   // 2. Extract just the card UID (e.g., "B3:9E:38:F6") from the string.
   // This regex matches a 4 or 7-byte UID format at the start of the string.
   const uidRegex = /^([0-9A-Fa-f]{2}(:|$)){4,7}/i;
+  console.log("UID Regex:", uidRegex);
   const match = cleaned_string.match(uidRegex);
+  console.log("Extracted UID match:", match);
 
   if (!match || !match[0]) {
     return NextResponse.json(
