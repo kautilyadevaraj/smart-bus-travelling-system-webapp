@@ -15,7 +15,6 @@ export async function POST(request: Request) {
   }
 
   const { card_uid: garbled_uid } = await request.json();
-  console.log(garbled_uid)
   if (!garbled_uid) {
     return NextResponse.json(
       { error: "Card UID is required" },
@@ -28,14 +27,13 @@ export async function POST(request: Request) {
 
   // 1. Remove the null byte (0x00) that causes the 'invalid byte sequence' error.
   const cleaned_string = garbled_uid.replace(/\0/g, "");
-  console.log("Cleaned UID string:", cleaned_string);
 
   // 2. Extract just the card UID (e.g., "B3:9E:38:F6") from the string.
-  // This regex matches a 4 or 7-byte UID format at the start of the string.
-  const uidRegex = /^([0-9A-Fa-f]{2}(:|$)){4,7}/i;
-  console.log("UID Regex:", uidRegex);
+  // --- THIS REGEX IS NOW FIXED ---
+  // It looks for a 4-byte (XX:XX:XX:XX) or 7-byte (XX:XX:XX:XX:XX:XX:XX) pattern at the start.
+  const uidRegex =
+    /^((?:[0-9A-F]{2}:){3}[0-9A-F]{2}|(?:[0-9A-F]{2}:){6}[0-9A-F]{2})/i;
   const match = cleaned_string.match(uidRegex);
-  console.log("Extracted UID match:", match);
 
   if (!match || !match[0]) {
     return NextResponse.json(
