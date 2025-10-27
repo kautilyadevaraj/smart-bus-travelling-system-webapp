@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Bus, TrendingUp, CreditCard } from "lucide-react";
+import Login from "@/components/login";
 
 const chartData = [
   { day: "Mon", amount: 240 },
@@ -40,7 +41,7 @@ export default function Dashboard() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
       </div>
-
+    <Login></Login>
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border">
