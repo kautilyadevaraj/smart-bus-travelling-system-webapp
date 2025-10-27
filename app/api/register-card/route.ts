@@ -7,7 +7,6 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   const supabase = await createClient();
 
-  // Check if user is logged in
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -15,53 +14,74 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const { card_uid } = await request.json();
-  if (!card_uid) {
+  const { card_uid: garbled_uid } = await request.json();
+  if (!garbled_uid) {
     return NextResponse.json(
       { error: "Card UID is required" },
       { status: 400 }
     );
   }
 
-  try {
-    // Find the user in our public 'users' table and update their card_uid
-    // This assumes the user's profile has been created in our public table
-    // (A more robust way is to use a Supabase trigger to copy auth.users to public.users)
+  // --- NEW FIX: Clean the incoming data ---
+  // The raw data from the pin is "B3:9E:38:F6ENTRY0.0000000.000000" + a null byte.
 
-    // For simplicity, let's try to find them, if not, create them.
+  // 1. Remove the null byte (0x00) that causes the 'invalid byte sequence' error.
+  const cleaned_string = garbled_uid.replace(/\0/g, "");
+
+  // 2. Extract just the card UID (e.g., "B3:9E:38:F6") from the string.
+  // This regex matches a 4 or 7-byte UID format at the start of the string.
+  const uidRegex = /^([0-9A-Fa-f]{2}(:|$)){4,7}/i;
+  const match = cleaned_string.match(uidRegex);
+
+  if (!match || !match[0]) {
+    return NextResponse.json(
+      {
+        error: "Could not parse a valid Card UID from the tap.",
+        received: cleaned_string,
+      },
+      { status: 400 }
+    );
+  }
+
+  // This is the clean, final Card UID
+  const final_card_uid = match[0].toUpperCase();
+  // --- END OF FIX ---
+
+  try {
     const [existingUser] = await db
       .select()
       .from(users)
       .where(eq(users.id, user.id));
 
     if (!existingUser) {
-      // If profile doesn't exist, create it
       await db.insert(users).values({
         id: user.id,
         email: user.email!,
-        name: user.user_metadata?.name,
-        card_uid: card_uid,
+        name: user.user_metadata?.name || "New User",
+        card_uid: final_card_uid, // Use the clean UID
       });
     } else {
-      // If profile exists, update it
       await db
         .update(users)
-        .set({ card_uid: card_uid })
+        .set({ card_uid: final_card_uid }) // Use the clean UID
         .where(eq(users.id, user.id));
     }
 
-    return NextResponse.json({ success: true, card_uid: card_uid });
+    return NextResponse.json({ success: true, card_uid: final_card_uid });
   } catch (error: any) {
-    // Handle potential unique constraint error (card already registered)
-    if (error.code === "23505") {
+    if (
+      error.code === "23505" ||
+      (error.message && error.message.includes("unique constraint"))
+    ) {
       return NextResponse.json(
         { error: "This card is already registered to another user." },
         { status: 409 }
       );
     }
-    console.error("Error registering card:", error);
+
+    console.error("Error registering card:", error.message);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: error.message },
       { status: 500 }
     );
   }
