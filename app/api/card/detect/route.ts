@@ -1,57 +1,66 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-const BLYNK_AUTH_TOKEN = process.env.NEXT_PUBLIC_BLYNK_AUTH_TOKEN;
-const BLYNK_GET_URL = `https://blynk.cloud/external/api/get?token=${BLYNK_AUTH_TOKEN}&v0`;
-const BLYNK_UPDATE_URL = `https://blynk.cloud/external/api/update?token=${BLYNK_AUTH_TOKEN}&v0=0`;
+const BLYNK_TOKEN = process.env.NEXT_PUBLIC_BLYNK_AUTH_TOKEN;
+// URL to SET the mode to "Linking" (V4=1)
+const BLYNK_MODE_LINK_URL = `https://blynk.cloud/external/api/update?token=${BLYNK_TOKEN}&v4=1`;
+// URL to SET the mode to "Ride" (V4=0)
+const BLYNK_MODE_RIDE_URL = `https://blynk.cloud/external/api/update?token=${BLYNK_TOKEN}&v4=0`;
+// URL to READ the linking tap from V5
+const BLYNK_GET_V5_URL = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&v5`;
+// URL to CLEAR the linking tap from V5
+const BLYNK_CLEAR_V5_URL = `https://blynk.cloud/external/api/update?token=${BLYNK_TOKEN}&v5=0`;
 
-// This regex matches a 4-byte (XX:XX:XX:XX) or 7-byte (XX:XX:XX:XX:XX:XX:XX) UID pattern.
-const uidRegex =
-  /^((?:[0-9A-F]{2}:){3}[0-9A-F]{2}|(?:[0-9A-F]{2}:){6}[0-9A-F]{2})/i;
+// Our trusty regex to clean the UID
+const UID_REGEX = /^([0-9A-Fa-f]{2}:){3,}([0-9A-Fa-f]{2})/;
 
 export async function POST(request: NextRequest) {
   try {
-    // Clear the Blynk pin first to ensure a fresh reading
-    await fetch(BLYNK_UPDATE_URL);
+    // 1. Clear the V5 pin
+    await fetch(BLYNK_CLEAR_V5_URL);
 
+    // 2. Tell the ESP32 to enter "Linking Mode"
+    await fetch(BLYNK_MODE_LINK_URL);
+
+    // 3. Poll V5 for the new card tap
     let attempts = 0;
-    const maxAttempts = 30; // 60 seconds max (30 * 2 seconds)
+    const maxAttempts = 30; // 60 seconds
 
     while (attempts < maxAttempts) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      const response = await fetch(BLYNK_GET_URL);
+      const response = await fetch(BLYNK_GET_V5_URL);
       if (!response.ok) throw new Error("Failed to fetch from Blynk");
 
-      const garbled_uid = await response.text();
+      const rawValue = await response.text();
 
-      if (garbled_uid && garbled_uid !== "0" && garbled_uid.length > 2) {
-        // --- FIX: Parse the garbled UID ---
-        const cleaned_string = garbled_uid.replace(/\0/g, ""); // Remove null bytes
-        const match = cleaned_string.match(uidRegex);
+      if (rawValue && rawValue !== "0" && rawValue.length > 2) {
+        // We got a tap!
 
-        if (match && match[0]) {
-          const final_card_uid = match[0].toUpperCase();
+        // 4. Clean the UID
+        const cleanedValue = rawValue.replace(/\0/g, ""); // Remove null chars
+        const match = cleanedValue.match(UID_REGEX);
+        const cardUID = match ? match[0] : null;
 
-          // Clear pin after successful detection
-          await fetch(BLYNK_UPDATE_URL);
-
-          // Return *only* the clean UID
-          return NextResponse.json({ success: true, cardUID: final_card_uid });
+        if (cardUID) {
+          // 5. Clear V5 and set mode back to Ride
+          await fetch(BLYNK_CLEAR_V5_URL);
+          await fetch(BLYNK_MODE_RIDE_URL);
+          return NextResponse.json({ success: true, cardUID: cardUID });
         }
-        // --- END OF FIX ---
       }
-
       attempts++;
     }
 
-    // Timeout - no valid card detected
-    await fetch(BLYNK_UPDATE_URL);
+    // Timeout
+    await fetch(BLYNK_MODE_RIDE_URL); // Set back to Ride Mode
     return NextResponse.json(
       { success: false, error: "Card detection timeout" },
       { status: 408 }
     );
   } catch (error) {
     console.error("Card detection error:", error);
+    // Ensure we go back to ride mode on error
+    await fetch(BLYNK_MODE_RIDE_URL);
     return NextResponse.json(
       { success: false, error: "Failed to detect card" },
       { status: 500 }
