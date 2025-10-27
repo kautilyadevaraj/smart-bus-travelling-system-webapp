@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   }
 
   const { card_uid: garbled_uid } = await request.json();
+  console.log(garbled_uid)
   if (!garbled_uid) {
     return NextResponse.json(
       { error: "Card UID is required" },
