@@ -14,6 +14,7 @@ import {
   Download,
   Share2,
 } from "lucide-react";
+import { use } from "react";
 
 // Mock ride data with route coordinates
 const rideDataMap: Record<string, any> = {
@@ -185,9 +186,10 @@ function RouteMap({ routePoints }: RouteMapProps) {
 export default function RideDetailsPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const rideData = rideDataMap[params.id] || rideDataMap["1"];
+  const { id } = use(params);
+  const rideData = rideDataMap[id] || rideDataMap["1"];
   const [copied, setCopied] = useState(false);
 
   const handleCopyDetails = () => {
