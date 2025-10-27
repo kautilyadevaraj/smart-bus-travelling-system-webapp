@@ -2,7 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, History, User, Settings, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  History,
+  User,
+  Settings,
+  LogOut,
+  CreditCard,
+} from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -10,6 +17,7 @@ export default function Sidebar() {
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/ride-history", label: "Ride History", icon: History },
+    { href: "/smart-card", label: "Smart Card", icon: CreditCard },
     { href: "/profile", label: "Profile", icon: User },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
