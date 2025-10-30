@@ -5,6 +5,10 @@ import { NextResponse } from "next/server";
 
 const UID_REGEX = /^([0-9A-Fa-f]{2}:){3,}([0-9A-Fa-f]{2})/;
 
+// Hardcoded locations
+const LOCATION_A = { lat: 12.9770, lng: 77.5706 }; // Majestic
+const LOCATION_B = { lat: 12.9352, lng: 77.6245 }; // Koramangala
+
 // A simple function to calculate fare.
 // You can make this complex later (e.g., based on time).
 function calculateFare(startTime: Date, endTime: Date): number {
@@ -56,8 +60,8 @@ export async function POST(request: Request) {
         userId: user.id,
         status: "IN_PROGRESS",
         startTime: new Date(),
-        startLat: lat,
-        startLng: lng,
+        startLat: LOCATION_A.lat.toString(),
+        startLng: LOCATION_A.lng.toString(),
       });
 
       return NextResponse.json({
@@ -79,8 +83,8 @@ export async function POST(request: Request) {
         .set({
           status: "COMPLETED",
           endTime: endTime,
-          endLat: lat,
-          endLng: lng,
+          endLat: LOCATION_B.lat.toString(),
+          endLng: LOCATION_B.lng.toString(),
           fare: fare.toString(), // Drizzle numeric types often prefer strings
         })
         .where(eq(rides.id, inProgressRide.id));
