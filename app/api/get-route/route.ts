@@ -6,11 +6,9 @@ import { eq } from "drizzle-orm";
 
 const OLA_MAPS_API_KEY = process.env.OLA_MAPS_API_KEY;
 const OLA_DIRECTIONS_URL = "https://api.olamaps.io/routing/v1/directions";
-// --- NEW: Add Reverse Geocode API URL ---
 const OLA_REVERSE_GEOCODE_URL =
   "https://api.olamaps.io/places/v1/reverse-geocode";
 
-// --- NEW: Helper function to get address from coordinates ---
 async function getAddress(lat: number, lng: number): Promise<string> {
   try {
     const url = `${OLA_REVERSE_GEOCODE_URL}?latlng=${lat},${lng}&api_key=${OLA_MAPS_API_KEY}`;
@@ -18,14 +16,12 @@ async function getAddress(lat: number, lng: number): Promise<string> {
     if (!response.ok) return "Address not found";
 
     const data = await response.json();
-    // Use the first result's formatted address
     return data?.results?.[0]?.formatted_address || `${lat}, ${lng}`;
   } catch (error) {
     console.error("Reverse geocode error:", error);
     return "Address not found";
   }
 }
-// ---------------------------------------------------------
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Fetch Ride Data from Supabase
+    // 1. Fetch Ride Data from Database
     const [rideData] = await db
       .select()
       .from(rides)
@@ -48,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Ride not found" }, { status: 404 });
     }
 
-    // --- Check for coordinates ---
+    // Check for coordinates
     if (
       !rideData.startLat ||
       !rideData.startLng ||
@@ -62,11 +58,11 @@ export async function POST(request: NextRequest) {
         distance: null,
         duration: null,
         startAddress: "N/A",
-        endAddress: "N/A", // Add blank addresses
+        endAddress: "N/A",
       });
     }
 
-    // --- NEW: Fetch addresses in parallel with the route ---
+    // Fetch addresses in parallel with the route
     const startAddrPromise = getAddress(
       Number(rideData.startLat),
       Number(rideData.startLng)
@@ -75,7 +71,6 @@ export async function POST(request: NextRequest) {
       Number(rideData.endLat),
       Number(rideData.endLng)
     );
-    // ----------------------------------------------------
 
     // 2. Format coordinates for Ola
     const origin = `${rideData.startLat},${rideData.startLng}`;
@@ -90,13 +85,11 @@ export async function POST(request: NextRequest) {
       headers: { Accept: "application/json" },
     });
 
-    // --- Initialize route variables ---
     let route = null;
     let steps = [];
     let distance = null;
     let duration = null;
     let routeError = null;
-    // ---------------------------------
 
     if (response.ok) {
       const data = await response.json();
@@ -133,8 +126,8 @@ export async function POST(request: NextRequest) {
       distance: distance,
       duration: duration,
       routeError: routeError,
-      startAddress: startAddress, // <-- NEW
-      endAddress: endAddress, // <-- NEW
+      startAddress: startAddress,
+      endAddress: endAddress,
     };
 
     return NextResponse.json(combinedData);

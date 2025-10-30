@@ -31,9 +31,7 @@ export default function RootLayout({
 
         {/* Mobile: MobileNav only */}
         <div className="md:hidden flex flex-col h-screen">
-          <SidebarProvider>
             <MobileNav />
-          </SidebarProvider>
 
           <main className="flex-1 overflow-auto">{children}</main>
         </div>
