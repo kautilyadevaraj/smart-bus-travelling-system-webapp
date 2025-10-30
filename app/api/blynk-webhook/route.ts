@@ -15,6 +15,7 @@ function calculateFare(startTime: Date, endTime: Date): number {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log(body);
     const rawUid = body.card_uid;
     const lat = body.lat;
     const lng = body.lng;
