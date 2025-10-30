@@ -1,186 +1,57 @@
 "use client";
-
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useState, useMemo } from "react";
+import { type rides } from "@/db/schema";
+import type { InferSelectModel } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   ArrowLeft,
-  MapPin,
   Clock,
-  Bus,
-  CreditCard,
-  Zap,
-  Download,
-  Share2,
+  IndianRupee,
+  Route,
+  Footprints,
+  MapPin,
 } from "lucide-react";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+// REMOVE this line - no longer need leaflet CSS
+// import "leaflet/dist/leaflet.css";
+import { format } from "date-fns";
 import { use } from "react";
 
-// Mock ride data with route coordinates
-const rideDataMap: Record<string, any> = {
-  "1": {
-    id: "1",
-    startLocation: "Central Station",
-    endLocation: "Airport Terminal 2",
-    startCoords: { lat: 28.6139, lng: 77.209 },
-    endCoords: { lat: 28.5562, lng: 77.1 },
-    duration: "45 minutes",
-    distance: "32.5 km",
-    baseFare: "₹50",
-    distanceCharge: "₹75",
-    total: "₹125",
-    busId: "BUS-2024-001",
-    busNumber: "AC-101",
-    driverName: "Rajesh Kumar",
-    driverRating: 4.8,
-    cardUid: "B3:9E:38:F6",
-    dateTime: "2024-10-25 08:30 AM",
-    status: "Completed",
-    routePoints: [
-      { lat: 28.6139, lng: 77.209, label: "Start" },
-      { lat: 28.605, lng: 77.2 },
-      { lat: 28.59, lng: 77.18 },
-      { lat: 28.57, lng: 77.14 },
-      { lat: 28.5562, lng: 77.1, label: "End" },
-    ],
-  },
-  "2": {
-    id: "2",
-    startLocation: "Downtown",
-    endLocation: "Shopping Mall",
-    startCoords: { lat: 28.63, lng: 77.22 },
-    endCoords: { lat: 28.55, lng: 77.25 },
-    duration: "25 minutes",
-    distance: "18.3 km",
-    baseFare: "₹40",
-    distanceCharge: "₹45",
-    total: "₹85",
-    busId: "BUS-2024-002",
-    busNumber: "AC-205",
-    driverName: "Priya Singh",
-    driverRating: 4.9,
-    cardUid: "B3:9E:38:F6",
-    dateTime: "2024-10-25 02:15 PM",
-    status: "Completed",
-    routePoints: [
-      { lat: 28.63, lng: 77.22, label: "Start" },
-      { lat: 28.61, lng: 77.23 },
-      { lat: 28.58, lng: 77.24 },
-      { lat: 28.55, lng: 77.25, label: "End" },
-    ],
-  },
-  "3": {
-    id: "3",
-    startLocation: "University",
-    endLocation: "Central Station",
-    startCoords: { lat: 28.54, lng: 77.27 },
-    endCoords: { lat: 28.6139, lng: 77.209 },
-    duration: "35 minutes",
-    distance: "22.1 km",
-    baseFare: "₹45",
-    distanceCharge: "₹50",
-    total: "₹95",
-    busId: "BUS-2024-003",
-    busNumber: "AC-310",
-    driverName: "Amit Patel",
-    driverRating: 4.7,
-    cardUid: "B3:9E:38:F6",
-    dateTime: "2024-10-24 09:00 AM",
-    status: "Completed",
-    routePoints: [
-      { lat: 28.54, lng: 77.27, label: "Start" },
-      { lat: 28.56, lng: 77.25 },
-      { lat: 28.59, lng: 77.23 },
-      { lat: 28.6139, lng: 77.209, label: "End" },
-    ],
-  },
-};
+type Polyline = [number, number][];
+type Ride = InferSelectModel<typeof rides>;
 
-interface RouteMapProps {
-  routePoints: Array<{ lat: number; lng: number; label?: string }>;
+interface Step {
+  instructions: string;
+  distance: string;
+  duration: string;
+  maneuver?: string;
 }
 
-function RouteMap({ routePoints }: RouteMapProps) {
-  return (
-    <div className="w-full h-96 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 rounded-lg flex flex-col items-center justify-center relative overflow-hidden border border-border">
-      {/* Map Background with Grid */}
-      <div className="absolute inset-0 opacity-10">
-        <div
-          className="w-full h-full"
-          style={{
-            backgroundImage:
-              "linear-gradient(0deg, transparent 24%, rgba(255,0,0,.05) 25%, rgba(255,0,0,.05) 26%, transparent 27%, transparent 74%, rgba(255,0,0,.05) 75%, rgba(255,0,0,.05) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(255,0,0,.05) 25%, rgba(255,0,0,.05) 26%, transparent 27%, transparent 74%, rgba(255,0,0,.05) 75%, rgba(255,0,0,.05) 76%, transparent 77%, transparent)",
-            backgroundSize: "50px 50px",
-          }}
-        />
-      </div>
+interface CombinedRideDetails {
+  ride: Ride;
+  route: Polyline | null;
+  steps: Step[] | null;
+  distance: number | null;
+  duration: number | null;
+  startAddress: string;
+  endAddress: string;
+  routeError?: string;
+}
 
-      {/* Route Visualization */}
-      <svg
-        className="absolute inset-0 w-full h-full"
-        style={{ pointerEvents: "none" }}
-      >
-        {/* Route Line */}
-        <polyline
-          points={routePoints
-            .map((p, i) => {
-              const x = 50 + (i / (routePoints.length - 1)) * 300;
-              const y = 150 + Math.sin(i * 0.5) * 30;
-              return `${x},${y}`;
-            })
-            .join(" ")}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          className="text-blue-500"
-          strokeDasharray="5,5"
-        />
-
-        {/* Route Points */}
-        {routePoints.map((point, i) => {
-          const x = 50 + (i / (routePoints.length - 1)) * 300;
-          const y = 150 + Math.sin(i * 0.5) * 30;
-          const isStart = i === 0;
-          const isEnd = i === routePoints.length - 1;
-
-          return (
-            <g key={i}>
-              <circle
-                cx={x}
-                cy={y}
-                r={isStart || isEnd ? 8 : 5}
-                fill={isStart ? "#10b981" : isEnd ? "#ef4444" : "#3b82f6"}
-                stroke="white"
-                strokeWidth="2"
-              />
-              {(isStart || isEnd) && (
-                <text
-                  x={x}
-                  y={y - 20}
-                  textAnchor="middle"
-                  className="text-xs font-semibold fill-foreground"
-                >
-                  {point.label}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 flex gap-4 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-500" />
-          <span className="text-foreground">Start</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-foreground">End</span>
-        </div>
-      </div>
-    </div>
-  );
+function formatDuration(seconds: number): string {
+  if (isNaN(seconds) || seconds < 0) return "N/A";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  if (minutes === 0) return `${remainingSeconds} sec`;
+  return `${minutes} min ${remainingSeconds} sec`;
 }
 
 export default function RideDetailsPage({
@@ -189,245 +60,223 @@ export default function RideDetailsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const rideData = rideDataMap[id] || rideDataMap["1"];
-  const [copied, setCopied] = useState(false);
+  console.log("Page params.id on initial render:", id);
 
-  const handleCopyDetails = () => {
-    const details = `Ride Details\nFrom: ${rideData.startLocation}\nTo: ${rideData.endLocation}\nFare: ${rideData.total}\nBus: ${rideData.busNumber}\nDriver: ${rideData.driverName}`;
-    navigator.clipboard.writeText(details);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  // CHANGE: Import RideMapVector instead of RideMap
+  const Map = useMemo(
+    () =>
+      dynamic(() => import("@/components/RideMapVector"), {
+        loading: () => (
+          <div style={{ height: "400px", width: "100%" }}>
+            <p>Loading map...</p>
+          </div>
+        ),
+        ssr: false,
+      }),
+    []
+  );
+
+  const [data, setData] = useState<CombinedRideDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+
+    async function fetchRideDetails() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/get-route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rideId: id }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Error: ${res.statusText}`);
+        }
+
+        const json = await res.json();
+        setData(json);
+      } catch (err: any) {
+        console.error("Error fetching ride details:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchRideDetails();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-8 max-w-5xl">
+        <p>Loading ride details...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="container mx-auto p-8 max-w-5xl">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-500">Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Error: {error || "Ride data could not be loaded."}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const {
+    ride,
+    route,
+    steps,
+    distance,
+    duration,
+    startAddress,
+    endAddress,
+    routeError,
+  } = data;
 
   return (
-    <div className="p-6 md:p-8 space-y-6">
-      {/* Back Button */}
-      <Link href="/ride-history">
-        <Button
-          variant="ghost"
-          className="gap-2 text-foreground hover:bg-muted"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Ride History
+    <div className="container mx-auto p-8 max-w-5xl space-y-6">
+      <Link href="/">
+        <Button variant="ghost">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Rides
         </Button>
       </Link>
 
-      {/* Page Title */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Ride Details</h1>
-        <p className="text-muted-foreground mt-2">{rideData.dateTime}</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl">Ride Details</CardTitle>
+          <CardDescription>
+            {ride.startTime
+              ? format(new Date(ride.startTime), "PPP 'at' p")
+              : "Start time N/A"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center space-x-2">
+              <Clock className="h-5 w-5 text-gray-500" />
+              <span className="font-medium">Duration:</span>
+              <span>
+                {duration ? formatDuration(duration) : duration || "N/A"}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Footprints className="h-5 w-5 text-gray-500" />
+              <span className="font-medium">Distance:</span>
+              <span>
+                {distance
+                  ? `${(distance / 1000).toFixed(2)} km`
+                  : distance || "N/A"}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <IndianRupee className="h-5 w-5 text-gray-500" />
+              <span className="font-medium">Fare:</span>
+              <span>₹{ride.fare}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Route className="h-5 w-5 text-gray-500" />
+              <span className="font-medium">Status:</span>
+              <span
+                className={
+                  status === "completed"
+                    ? "text-green-600"
+                    : "text-yellow-600"
+                }
+              >
+                {ride.status}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Map Section */}
-        <Card className="md:col-span-2 bg-card border-border">
+      <Card>
+        <CardHeader>
+          <CardTitle>Route Map</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {routeError && (
+            <p className="text-yellow-600 mb-4">
+              {routeError || "Route data unavailable."}
+            </p>
+          )}
+          {route &&
+            ride.startLat &&
+            ride.startLng &&
+            ride.endLat &&
+            ride.endLng && (
+              <Map
+                start={{
+                  lat: Number(ride.startLat),
+                  lng: Number(ride.startLng),
+                }}
+                end={{
+                  lat: Number(ride.endLat),
+                  lng: Number(ride.endLng),
+                }}
+                route={route}
+              />
+            )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Addresses</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start space-x-3">
+            <MapPin className="h-5 w-5 text-green-600 mt-0.5" />
+            <div>
+              <p className="font-medium">Start Point</p>
+              <p className="text-sm text-gray-600">{startAddress}</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-3">
+            <MapPin className="h-5 w-5 text-red-600 mt-0.5" />
+            <div>
+              <p className="font-medium">End Point</p>
+              <p className="text-sm text-gray-600">{endAddress}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {steps && steps.length > 0 && (
+        <Card>
           <CardHeader>
-            <CardTitle className="text-card-foreground flex items-center gap-2">
-              <MapPin className="w-5 h-5" />
-              Route Map
-            </CardTitle>
+            <CardTitle>Turn-by-Turn Directions</CardTitle>
           </CardHeader>
           <CardContent>
-            <RouteMap routePoints={rideData.routePoints} />
+            <ol className="space-y-2 list-none">
+              {steps.map((step, index) => (
+                <li key={index} className="flex items-start space-x-2">
+                  <span className="font-bold text-blue-600">{index + 1}.</span>
+                  <div>
+                    <p>{step.instructions || "Continue"}</p>
+                    <p className="text-sm text-gray-500">
+                      {step.distance}{" "}
+                      {step.duration ? `(${step.duration})` : ""}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </CardContent>
         </Card>
-
-        {/* Right Sidebar */}
-        <div className="space-y-4">
-          {/* Status Badge */}
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-card-foreground">
-                  Status
-                </span>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    rideData.status === "Completed"
-                      ? "bg-green-500/20 text-green-700 dark:text-green-400"
-                      : "bg-blue-500/20 text-blue-700 dark:text-blue-400"
-                  }`}
-                >
-                  {rideData.status}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Trip Summary */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-card-foreground text-lg">
-                Trip Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-3">
-                <MapPin className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Start Location
-                  </p>
-                  <p className="text-sm font-semibold text-card-foreground">
-                    {rideData.startLocation}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <MapPin className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-muted-foreground">End Location</p>
-                  <p className="text-sm font-semibold text-card-foreground">
-                    {rideData.endLocation}
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-4 flex gap-3">
-                <Clock className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                  <p className="text-sm font-semibold text-card-foreground">
-                    {rideData.duration}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Zap className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Distance</p>
-                  <p className="text-sm font-semibold text-card-foreground">
-                    {rideData.distance}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Fare Breakdown */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-card-foreground text-lg">
-                Fare Breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Base Fare</span>
-                <span className="text-card-foreground font-semibold">
-                  {rideData.baseFare}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Distance Charge</span>
-                <span className="text-card-foreground font-semibold">
-                  {rideData.distanceCharge}
-                </span>
-              </div>
-              <div className="border-t border-border pt-3 flex justify-between">
-                <span className="text-sm font-semibold text-card-foreground">
-                  Total Fare
-                </span>
-                <span className="text-lg font-bold text-card-foreground">
-                  {rideData.total}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Driver Information */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-card-foreground text-lg">
-                Driver Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Driver Name</p>
-                <p className="text-sm font-semibold text-card-foreground">
-                  {rideData.driverName}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Rating</p>
-                <p className="text-sm font-semibold text-card-foreground">
-                  ⭐ {rideData.driverRating}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Bus Information */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-card-foreground text-lg flex items-center gap-2">
-                <Bus className="w-5 h-5" />
-                Bus Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Bus Number</p>
-                <p className="text-sm font-semibold text-card-foreground">
-                  {rideData.busNumber}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Bus ID</p>
-                <p className="text-sm font-mono text-card-foreground">
-                  {rideData.busId}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Payment Information */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-card-foreground text-lg flex items-center gap-2">
-                <CreditCard className="w-5 h-5" />
-                Payment
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Card UID</p>
-                <p className="text-sm font-mono text-card-foreground">
-                  {rideData.cardUid}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Payment Method</p>
-                <p className="text-sm font-semibold text-card-foreground">
-                  Smart Card
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            <Button
-              onClick={handleCopyDetails}
-              variant="outline"
-              className="flex-1 gap-2 border-border text-foreground hover:bg-muted bg-transparent"
-            >
-              <Download className="w-4 h-4" />
-              {copied ? "Copied!" : "Copy"}
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1 gap-2 border-border text-foreground hover:bg-muted bg-transparent"
-            >
-              <Share2 className="w-4 h-4" />
-              Share
-            </Button>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
