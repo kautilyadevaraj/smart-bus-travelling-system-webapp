@@ -99,10 +99,7 @@ function CardSkeleton() {
 
 function MapSkeleton() {
   return (
-    <Card className="bg-card border border-border overflow-hidden">
-      <CardHeader>
-        <Skeleton className="h-6 w-32" />
-      </CardHeader>
+    <Card className="bg-card border border-border py-0 overflow-hidden">
       <CardContent className="p-0">
         <Skeleton className="h-96 md:h-[500px] w-full" />
       </CardContent>
@@ -373,7 +370,7 @@ export default function RideDetailsPage({
           </Card>
 
           {/* Trip Summary - Now includes locations */}
-          <Card className="bg-card border border-border py-4">
+          <Card className="bg-card border border-border py-4 gap-2">
             <CardHeader>
               <CardTitle className="text-lg text-card-foreground">
                 Trip Summary
@@ -381,7 +378,7 @@ export default function RideDetailsPage({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="pb-4 border-b border-border">
-                <div className="space-y-3">
+                <div className="space-y-1">
                   {/* Start Location */}
                   <div className="flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
@@ -451,8 +448,8 @@ export default function RideDetailsPage({
 
           {steps && steps.length > 0 && (
             <Collapsible open={directionsOpen} onOpenChange={setDirectionsOpen}>
-              <Card className="bg-card border border-border">
-                <CollapsibleTrigger asChild>
+              <Card className="bg-card border border-border py-3 justify-center">
+                <CollapsibleTrigger asChild className="pt-2">
                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-card-foreground flex items-center gap-2">
@@ -495,14 +492,14 @@ export default function RideDetailsPage({
         {/* Right Column: Details */}
         <div className="space-y-4">
           {/* Fare Breakdown */}
-          <Card className="bg-card border border-border">
-            <CardHeader>
+          <Card className="bg-card border border-border py-3 gap-1">
+            <CardHeader className="">
               <CardTitle className="text-lg text-card-foreground flex items-center gap-2">
-                <IndianRupee className="w-5 h-5" />
                 Fare Details
+                <IndianRupee className="w-5 h-5" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-0">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Final Fare</span>
                 <span className="font-bold text-lg text-card-foreground">
