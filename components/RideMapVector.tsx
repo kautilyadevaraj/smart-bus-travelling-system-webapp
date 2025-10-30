@@ -24,9 +24,10 @@ export default function RideMapVector({ start, end, route }: MapProps) {
         container: mapContainer.current,
         style: `https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json?api_key=${OLA_MAPS_API_KEY}`,
         center: [start.lng, start.lat],
-        zoom: 12,
+        zoom: 15,
+        pitch: 60, // 3D view angle
+        bearing: 0, // Map rotation
         transformRequest: (url, resourceType) => {
-          // Add API key to all Ola Maps requests
           if (url.includes("api.olamaps.io") && !url.includes("api_key=")) {
             const separator = url.includes("?") ? "&" : "?";
             url = `${url}${separator}api_key=${OLA_MAPS_API_KEY}`;
@@ -35,24 +36,75 @@ export default function RideMapVector({ start, end, route }: MapProps) {
         },
       });
 
+      // Add navigation controls (zoom, rotation, pitch)
+      map.current.addControl(
+        new maplibregl.NavigationControl({
+          visualizePitch: true,
+        }),
+        "top-right"
+      );
+
       // Filter out harmless 3D model layer errors
       map.current.on("error", (e) => {
         const errorMessage = e.error?.message || "";
-
-        // Ignore 3D model layer errors - these are expected with Ola Maps style
         if (
           errorMessage.includes("3d_model") ||
           errorMessage.includes("does not exist on source")
         ) {
-          return; // Silently ignore these errors
+          return;
         }
-
-        // Log other errors that might be important
         console.error("Map error:", errorMessage);
       });
 
       map.current.on("load", () => {
         if (!map.current) return;
+
+        // Add 3D buildings layer
+        const layers = map.current.getStyle().layers;
+        let labelLayerId;
+
+        // Find the first symbol layer to insert buildings below labels
+        for (let i = 0; i < layers.length; i++) {
+          if (layers[i].type === "symbol") {
+            labelLayerId = layers[i].id;
+            break;
+          }
+        }
+
+        // Add 3D building extrusions
+        map.current.addLayer(
+          {
+            id: "3d-buildings",
+            source: "vectordata",
+            "source-layer": "building",
+            filter: ["==", "extrude", "true"],
+            type: "fill-extrusion",
+            minzoom: 13,
+            paint: {
+              "fill-extrusion-color": "#aaa",
+              "fill-extrusion-height": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                13,
+                0,
+                16,
+                ["get", "height"],
+              ],
+              "fill-extrusion-base": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                13,
+                0,
+                16,
+                ["get", "min_height"],
+              ],
+              "fill-extrusion-opacity": 0.6,
+            },
+          },
+          labelLayerId
+        );
 
         // Add start marker (green)
         new maplibregl.Marker({ color: "#22c55e" })
@@ -66,7 +118,7 @@ export default function RideMapVector({ start, end, route }: MapProps) {
           .setPopup(new maplibregl.Popup().setHTML("<p>End Point</p>"))
           .addTo(map.current);
 
-        // Add route line
+        // Add route line with elevated position
         const routeCoordinates = route.map(([lat, lng]) => [lng, lat]);
 
         map.current.addSource("route", {
@@ -96,10 +148,10 @@ export default function RideMapVector({ start, end, route }: MapProps) {
           },
         });
 
-        // Fit map to show entire route
+        // Fit bounds to route
         const bounds = new maplibregl.LngLatBounds();
         route.forEach(([lat, lng]) => bounds.extend([lng, lat]));
-        map.current.fitBounds(bounds, { padding: 50 });
+        map.current.fitBounds(bounds, { padding: 100 });
       });
     } catch (error) {
       console.error("Failed to initialize map:", error);
@@ -115,7 +167,7 @@ export default function RideMapVector({ start, end, route }: MapProps) {
     <div
       ref={mapContainer}
       style={{
-        height: "400px",
+        height: "500px", // Increased height for 3D view
         width: "100%",
         borderRadius: "8px",
       }}
