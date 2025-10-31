@@ -1,30 +1,23 @@
-import { dbAdmin as db } from "@/db/admin";
-import { rides, users } from "@/db/schema";
+import { db } from "@/db";
+import { dbAdmin } from "@/db/admin";
+import { users, rides, payments } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { calculateFare } from "@/lib/fare-calculator";
 
 const UID_REGEX = /^([0-9A-Fa-f]{2}:){3,}([0-9A-Fa-f]{2})/;
 
-// Hardcoded locations
-const LOCATION_A = { lat: 12.9770, lng: 77.5706 }; // Majestic
-const LOCATION_B = { lat: 12.9352, lng: 77.6245 }; // Koramangala
-
-// A simple function to calculate fare.
-// You can make this complex later (e.g., based on time).
-function calculateFare(startTime: Date, endTime: Date): number {
-  // For now, a flat fare
-  return 25.0;
-}
+// Mock route data - Replace with real Ola Maps API calls
+const ROUTES = {
+  "12.9716,77.5946": { lat: 12.9716, lng: 77.5946, name: "Majestic" },
+};
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log(body);
-    const rawUid = body.card_uid;
-    const lat = body.lat;
-    const lng = body.lng;
+    console.log("📍 Tap received:", body);
 
-    // 1. Clean the incoming UID
+    const rawUid = body.card_uid;
     const cleanedValue = rawUid ? String(rawUid).replace(/\0/g, "") : "";
     const match = cleanedValue.match(UID_REGEX);
     const cardUID = match ? match[0] : null;
@@ -33,76 +26,160 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid card UID" }, { status: 400 });
     }
 
-    // 2. Find the user this card belongs to
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.card_uid, cardUID));
+    // Find user
+    const user = await dbAdmin.query.users.findFirst({
+      where: eq(users.card_uid, cardUID),
+    });
 
     if (!user) {
-      // Not a registered card. Reject the tap.
+      console.log("❌ Unregistered card:", cardUID);
       return NextResponse.json(
         { error: "Card not registered" },
         { status: 401 }
       );
     }
 
-    // 3. This is a registered user. Check if they are on a ride.
-    const [inProgressRide] = await db
-      .select()
-      .from(rides)
-      .where(and(eq(rides.userId, user.id), eq(rides.status, "IN_PROGRESS")));
+    // Check for ongoing ride
+    const ongoingRide = await dbAdmin.query.rides.findFirst({
+      where: and(
+        eq(rides.userId, user.id),
+        eq(rides.status, "IN_PROGRESS")
+      ),
+    });
 
-    // 4. --- LOGIC: No active ride ---
-    if (!inProgressRide) {
-      // This is an "ENTRY" tap. Start a new ride.
-      await db.insert(rides).values({
+    if (!ongoingRide) {
+      // ===== ENTRY TAP =====
+      console.log("✅ Entry tap - Starting new ride");
+
+      const newRide = await dbAdmin.insert(rides).values({
         userId: user.id,
         status: "IN_PROGRESS",
         startTime: new Date(),
-        startLat: LOCATION_A.lat.toString(),
-        startLng: LOCATION_A.lng.toString(),
-      });
+        startLat: "12.9716",
+        startLng: "77.5946",
+      }).returning();
 
       return NextResponse.json({
         success: true,
-        message: "Ride started.",
-        card: cardUID,
+        action: "ENTRY",
+        rideId: newRide[0].id,
+        message: "Ride started",
       });
-    }
 
-    // 5. --- LOGIC: Active ride found ---
-    if (inProgressRide) {
-      // This is an "EXIT" tap. Complete the ride.
-      const startTime = inProgressRide.startTime;
+    } else {
+      // ===== EXIT TAP - Calculate fare and process payment =====
+      console.log("🏁 Exit tap - Completing ride");
+
       const endTime = new Date();
-      const fare = calculateFare(startTime, endTime);
+      const durationMs = endTime.getTime() - ongoingRide.startTime.getTime();
+      const durationMinutes = durationMs / (1000 * 60);
 
-      await db
-        .update(rides)
-        .set({
-          status: "COMPLETED",
-          endTime: endTime,
-          endLat: LOCATION_B.lat.toString(),
-          endLng: LOCATION_B.lng.toString(),
-          fare: fare.toString(), // Drizzle numeric types often prefer strings
-        })
-        .where(eq(rides.id, inProgressRide.id));
+      // Mock distance calculation (replace with Ola Maps API)
+      const mockDistance = Math.random() * 15 + 3; // 3-18 km
 
-      return NextResponse.json({
-        success: true,
-        message: "Ride completed.",
-        fare: fare,
-      });
+      // Calculate fare
+      const fare = calculateFare(mockDistance, durationMinutes);
+      console.log(`💰 Calculated fare: ₹${fare}`);
+
+      // Convert user balance to number for comparison
+      const userBalance = parseFloat(user.balance as string) || 0;
+
+      if (userBalance < fare) {
+        // ===== INSUFFICIENT BALANCE =====
+        console.log(`❌ Insufficient balance. Required: ₹${fare}, Available: ₹${userBalance}`);
+
+        // Update ride to INSUFFICIENT_BALANCE status
+        await dbAdmin.update(rides)
+          .set({
+            status: "INSUFFICIENT_BALANCE",
+            endTime: endTime,
+            endLat: "12.9352",
+            endLng: "77.6245",
+            distance: mockDistance.toString(),
+            duration: durationMinutes.toString(),
+            fare: fare.toString(),
+            paymentStatus: "FAILED",
+          })
+          .where(eq(rides.id, ongoingRide.id));
+
+        // Log failed payment
+        await dbAdmin.insert(payments).values({
+          userId: user.id,
+          rideId: ongoingRide.id,
+          amount: fare.toString(),
+          balanceBefore: userBalance.toString(),
+          balanceAfter: userBalance.toString(),
+          status: "FAILED",
+          reason: `Insufficient balance. Required: ₹${fare}, Available: ₹${userBalance}`,
+        });
+
+        return NextResponse.json({
+          success: false,
+          action: "EXIT_FAILED",
+          rideId: ongoingRide.id,
+          fare: fare,
+          userBalance: userBalance,
+          deficit: fare - userBalance,
+          message: `Insufficient balance. Needs ₹${(fare - userBalance).toFixed(2)} more`,
+          errorCode: "INSUFFICIENT_BALANCE",
+        }, { status: 402 }); // 402 Payment Required
+
+      } else {
+        // ===== PAYMENT SUCCESSFUL =====
+        const newBalance = userBalance - fare;
+
+        // Update user balance
+        await dbAdmin.update(users)
+          .set({ balance: newBalance.toString() })
+          .where(eq(users.id, user.id));
+
+        // Update ride to COMPLETED
+        await dbAdmin.update(rides)
+          .set({
+            status: "COMPLETED",
+            endTime: endTime,
+            endLat: "12.9352",
+            endLng: "77.6245",
+            distance: mockDistance.toString(),
+            duration: durationMinutes.toString(),
+            fare: fare.toString(),
+            paymentStatus: "SUCCESS",
+          })
+          .where(eq(rides.id, ongoingRide.id));
+
+        // Log successful payment
+        await dbAdmin.insert(payments).values({
+          userId: user.id,
+          rideId: ongoingRide.id,
+          amount: fare.toString(),
+          balanceBefore: userBalance.toString(),
+          balanceAfter: newBalance.toString(),
+          status: "SUCCESS",
+          reason: "Payment processed successfully",
+        });
+
+        console.log(`✅ Payment successful`);
+        console.log(`   Fare: ₹${fare}`);
+        console.log(`   Previous balance: ₹${userBalance}`);
+        console.log(`   New balance: ₹${newBalance}`);
+
+        return NextResponse.json({
+          success: true,
+          action: "EXIT_SUCCESS",
+          rideId: ongoingRide.id,
+          fare: fare,
+          userBalance: newBalance,
+          message: "Ride completed and payment processed",
+        });
+      }
+
     }
-
-    // Default catch (shouldn't be reached)
-    return NextResponse.json({ error: "Unhandled logic" }, { status: 500 });
-  } catch (error: any) {
-    console.error("Webhook error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error) {
+      console.error("❌ Webhook error:", error);
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      );
+    }
   }
-}
+
