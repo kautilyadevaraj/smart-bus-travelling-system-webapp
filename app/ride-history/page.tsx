@@ -93,7 +93,7 @@ export default function RideHistoryPage() {
     <div className="p-6 md:p-8 space-y-6">
       {/* Page Title */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Ride History</h1>
+        <h1 className="text-3xl font-bold">Ride History</h1>
         <p className="text-muted-foreground mt-2">
           View and manage all your past rides
         </p>

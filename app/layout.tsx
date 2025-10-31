@@ -1,12 +1,24 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { Figtree } from "next/font/google";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { MobileNav } from "@/components/mobile-nav";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
 
 const figtree = Figtree({
   subsets: ["latin"],
@@ -33,21 +45,38 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {/* Desktop: SidebarProvider with AppSidebar */}
-          <SidebarProvider className="hidden md:flex">
+          <SidebarProvider>
             <AppSidebar />
-            <div className="absolute top-3 right-3 z-50">
-              <AnimatedThemeToggler />
-            </div>
-            <main className="flex-1 overflow-auto w-full">{children}</main>
+            <SidebarInset>
+              <header className="flex h-16 shrink-0 items-center gap-2">
+                <div className="flex items-center gap-2 px-4">
+                  <SidebarTrigger className="-ml-1" />
+                  <Separator
+                    orientation="vertical"
+                    className="mr-2 data-[orientation=vertical]:h-4"
+                  />
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem className="hidden md:block">
+                        <BreadcrumbLink href="#">
+                          Building Your Application
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator className="hidden md:block" />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                </div>
+              </header>
+              <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                <div className="min-h-[100vh] flex-1 rounded-xl md:min-h-min">
+                  {children}
+                </div>
+              </div>
+            </SidebarInset>
           </SidebarProvider>
-
-          {/* Mobile: MobileNav only */}
-          <div className="md:hidden flex flex-col h-screen">
-            <MobileNav />
-
-            <main className="flex-1 overflow-auto">{children}</main>
-          </div>
         </ThemeProvider>
       </body>
     </html>

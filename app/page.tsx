@@ -11,7 +11,7 @@ import { TripEfficiencyChart } from "@/components/efficiency/trip-efficiency-cha
 export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 space-y-6">
+      <div className="container mx-auto px-4 pb-8 space-y-6">
         {/* Hero Section */}
         <DashboardHero />
 
