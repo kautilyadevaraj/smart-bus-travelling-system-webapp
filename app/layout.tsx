@@ -5,6 +5,8 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 
 const figtree = Figtree({
   subsets: ["latin"],
@@ -23,20 +25,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={` ${figtree.variable} antialiased`}>
-        {/* Desktop: SidebarProvider with AppSidebar */}
-        <SidebarProvider className="hidden md:flex">
-          <AppSidebar />
-          <main className="flex-1 overflow-auto w-full">{children}</main>
-        </SidebarProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {/* Desktop: SidebarProvider with AppSidebar */}
+          <SidebarProvider className="hidden md:flex">
+            <AppSidebar />
+            <div className="absolute top-3 right-3 z-50">
+              <AnimatedThemeToggler />
+            </div>
+            <main className="flex-1 overflow-auto w-full">{children}</main>
+          </SidebarProvider>
 
-        {/* Mobile: MobileNav only */}
-        <div className="md:hidden flex flex-col h-screen">
-          <MobileNav />
+          {/* Mobile: MobileNav only */}
+          <div className="md:hidden flex flex-col h-screen">
+            <MobileNav />
 
-          <main className="flex-1 overflow-auto">{children}</main>
-        </div>
+            <main className="flex-1 overflow-auto">{children}</main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -24,6 +24,7 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
+import { AnimatedThemeToggler } from "./ui/animated-theme-toggler";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -41,6 +42,8 @@ export function MobileNav() {
     <div className="border-b border-sidebar-border bg-sidebar">
       <div className="flex items-center justify-between p-4">
         <h1 className="text-xl font-bold text-sidebar-foreground">SmartRide</h1>
+        <div className="flex items-center gap-2">
+          <AnimatedThemeToggler />
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
             <button className="p-2 hover:bg-sidebar-accent rounded-lg">
@@ -78,7 +81,8 @@ export function MobileNav() {
               </SidebarMenu>
             </div>
           </SheetContent>
-        </Sheet>
+          </Sheet>
+          </div>
       </div>
     </div>
   );
