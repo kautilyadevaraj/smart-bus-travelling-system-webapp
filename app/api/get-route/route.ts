@@ -5,7 +5,7 @@ import { rides } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 const OLA_MAPS_API_KEY = process.env.OLA_MAPS_API_KEY;
-const OLA_DIRECTIONS_URL = "https://api.olamaps.io/routing/v1/directions";
+const OLA_DIRECTIONS_URL = "https://api.olamaps.io/routing/v1/directions/basic";
 const OLA_REVERSE_GEOCODE_URL =
   "https://api.olamaps.io/places/v1/reverse-geocode";
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     const destination = `${rideData.endLat},${rideData.endLng}`;
 
     // 3. Build the Ola Maps API URL
-    const url = `${OLA_DIRECTIONS_URL}?origin=${origin}&destination=${destination}&traffic=true&profile=auto&api_key=${OLA_MAPS_API_KEY}`;
+    const url = `${OLA_DIRECTIONS_URL}?origin=${origin}&destination=${destination}&api_key=${OLA_MAPS_API_KEY}`;
 
     // 4. Call the Ola Maps API
     const response = await fetch(url, {
