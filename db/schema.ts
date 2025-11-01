@@ -51,6 +51,8 @@ export const rides = pgTable("rides", {
     "payment_status"
   ).default("PENDING"), // NEW: Track payment
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  startLoc : text("start_loc"), // NEW: Human-readable start location
+  endLoc : text("end_loc"),     // NEW: Human-readable end location
 });
 
 /**
@@ -64,7 +66,6 @@ export const payments = pgTable("payments", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   rideId: uuid("ride_id")
-    .notNull()
     .references(() => rides.id, { onDelete: "cascade" }),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   balanceBefore: numeric("balance_before", {

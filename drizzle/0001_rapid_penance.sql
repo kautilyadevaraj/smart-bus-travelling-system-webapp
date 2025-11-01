@@ -1,0 +1,1 @@
+ALTER TABLE "payments" ALTER COLUMN "ride_id" DROP NOT NULL;

@@ -8,6 +8,20 @@
       "when": 1761891542354,
       "tag": "0000_sync_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1761998320456,
+      "tag": "0001_rapid_penance",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1761998475646,
+      "tag": "0002_happy_human_cannonball",
+      "breakpoints": true
     }
   ]
 }

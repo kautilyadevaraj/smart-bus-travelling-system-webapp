@@ -38,7 +38,7 @@ export default function Login() {
     setUser(null);
     router.push("/");
   };
-
+  console.log(user)
   if (user) {
     return (
       <div className="flex items-center gap-4">
