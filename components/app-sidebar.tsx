@@ -19,6 +19,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import Login from "./login"
 
 const data = {
   user: {
@@ -74,6 +75,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary}  />
       </SidebarContent>
       <SidebarFooter>
+        <Login></Login>
         <NavUser user={data.user} />
       </SidebarFooter>
     </Sidebar>

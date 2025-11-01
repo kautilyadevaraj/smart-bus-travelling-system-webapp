@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { TrendingUp } from "lucide-react";
 import { CartesianGrid, LabelList, Line, LineChart, XAxis } from "recharts";
 
@@ -18,18 +19,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 
-export const description = "A line chart with a label";
-
-const chartData = [
-  { month: "January", avgFare: 18 },
-  { month: "February", avgFare: 305 },
-  { month: "March", avgFare: 237 },
-  { month: "April", avgFare: 73 },
-  { month: "May", avgFare: 209 },
-  { month: "June", avgFare: 214 },
-  { month: "July", avgFare: 214 },
-];
-
 const chartConfig = {
   avgFare: {
     label: "avgFare",
@@ -38,6 +27,26 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function AverageFareChart() {
+  const [chartData, setChartData] = React.useState<
+    { month: string; avgFare: number }[]
+  >([]);
+  const [overallAverage, setOverallAverage] = React.useState(0);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("/api/dashboard/average-fare");
+        const result = await response.json();
+        setChartData(result.data || []);
+        setOverallAverage(result.summary?.overallAverage || 0);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   return (
     <Card>
       <CardHeader>
@@ -89,6 +98,14 @@ export function AverageFareChart() {
           </LineChart>
         </ChartContainer>
       </CardContent>
+      <CardFooter className="flex-col items-start gap-2 text-sm">
+        <div className="flex gap-2 font-medium leading-none">
+          Overall average:{" "}
+          <span className="text-green-600">
+            ₹{overallAverage.toLocaleString()}
+          </span>
+        </div>
+      </CardFooter>
     </Card>
   );
 }

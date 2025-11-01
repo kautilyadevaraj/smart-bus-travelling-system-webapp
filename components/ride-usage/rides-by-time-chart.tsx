@@ -2,6 +2,7 @@
 
 import { TrendingUp } from "lucide-react";
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
+import * as React from "react";
 
 import {
   Card,
@@ -18,48 +19,54 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 
-export const description = "A mixed bar chart";
-
-const chartData = [
-  { time: "chrome", rides: 12, fill: "var(--color-chrome)" },
-  { time: "safari", rides: 28, fill: "var(--color-safari)" },
-  { time: "firefox", rides: 18, fill: "var(--color-firefox)" },
-  { time: "edge", rides: 22, fill: "var(--color-edge)" },
-  { time: "other", rides: 35, fill: "var(--color-other)" },
-];
-
 const chartConfig = {
   rides: {
     label: "Rides",
   },
-  chrome: {
-    label: "Chrome",
+  "6-9 AM": {
+    label: "6-9 AM",
     color: "var(--chart-1)",
   },
-  safari: {
-    label: "Safari",
+  "12-3 PM": {
+    label: "12-3 PM",
     color: "var(--chart-2)",
   },
-  firefox: {
-    label: "Firefox",
+  "6-9 PM": {
+    label: "6-9 PM",
     color: "var(--chart-3)",
   },
-  edge: {
-    label: "Edge",
+  "12-3 AM": {
+    label: "12-3 AM",
     color: "var(--chart-4)",
-  },
-  other: {
-    label: "Other",
-    color: "var(--chart-5)",
   },
 } satisfies ChartConfig;
 
 export function RidesByTimeChart() {
+  const [chartData, setChartData] = React.useState<
+    { time: string; rides: number; fill: string }[]
+  >([]);
+  const [peakTime, setPeakTime] = React.useState("");
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("/api/dashboard/rides-by-time");
+        const result = await response.json();
+        setChartData(result.data || []);
+        setPeakTime(result.summary?.peakTime || "");
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Rides by Time of Day</CardTitle>
-        <CardDescription>Peak travel times throughout the day</CardDescription>
+        <CardDescription>Peak travel ranges throughout the day</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig}>
@@ -90,6 +97,11 @@ export function RidesByTimeChart() {
           </BarChart>
         </ChartContainer>
       </CardContent>
+      <CardFooter className="flex-col items-start gap-2 text-sm">
+        <div className="flex gap-2 font-medium leading-none">
+          Peak time: <span className="text-yellow-600">{peakTime}</span>
+        </div>
+      </CardFooter>
     </Card>
   );
 }

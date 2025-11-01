@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { TrendingUp } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 
@@ -18,14 +19,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 
-export const description = "A multiple bar chart";
-
-const chartData = [
-  { month: "Ride Count", weekday: 186, weekend: 80 },
-  { month: "Avg Duration (min)", weekday: 305, weekend: 200 },
-  { month: "Avg Fare (₹)", weekday: 237, weekend: 120 },
-];
-
 const chartConfig = {
   weekday: {
     label: "Weekday",
@@ -38,6 +31,30 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function WeekdayVsWeekendChart() {
+  const [chartData, setChartData] = React.useState<
+    { month: string; weekday: number; weekend: number }[]
+  >([]);
+  const [trendPercentage, setTrendPercentage] = React.useState(0);
+  const [weekdayCount, setWeekdayCount] = React.useState(0);
+  const [weekendCount, setWeekendCount] = React.useState(0);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("/api/dashboard/weekday-vs-weekend");
+        const result = await response.json();
+        setChartData(result.data || []);
+        setTrendPercentage(result.summary?.trendPercentage || 0);
+        setWeekdayCount(result.summary?.weekdayCount || 0);
+        setWeekendCount(result.summary?.weekendCount || 0);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   return (
     <Card>
       <CardHeader>
@@ -62,15 +79,22 @@ export function WeekdayVsWeekendChart() {
             <Bar dataKey="weekend" fill="var(--color-weekend)" radius={4} />
           </BarChart>
         </ChartContainer>
-        <CardFooter className="flex-col gap-2 text-sm pt-4">
-          <div className="flex items-center gap-2 leading-none font-medium">
-            Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
-          </div>
-          <div className="text-muted-foreground leading-none">
-            Showing total visitors for the last 6 months
-          </div>
-        </CardFooter>
       </CardContent>
+      <CardFooter className="flex-col gap-2 text-sm pt-4">
+        <div className="flex items-center gap-2 leading-none font-medium">
+          {trendPercentage > 0 ? (
+            <>
+              More weekday rides by {Math.abs(trendPercentage)}%
+              <TrendingUp className="h-4 w-4" />
+            </>
+          ) : (
+            <>More weekend rides by {Math.abs(trendPercentage)}%</>
+          )}
+        </div>
+        <div className="text-muted-foreground leading-none">
+          Weekday: {weekdayCount} rides | Weekend: {weekendCount} rides
+        </div>
+      </CardFooter>
     </Card>
   );
 }

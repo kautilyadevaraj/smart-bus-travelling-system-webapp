@@ -28,64 +28,6 @@ import {
 
 export const description = "An interactive area chart";
 
-const chartData = [
-  { date: "2024-04-01", spent: 222 },
-  { date: "2024-04-02", spent: 97 },
-  { date: "2024-04-03", spent: 167 },
-  { date: "2024-04-04", spent: 242 },
-  { date: "2024-04-05", spent: 373 },
-  { date: "2024-04-06", spent: 301 },
-  { date: "2024-04-07", spent: 245 },
-  { date: "2024-04-08", spent: 409 },
-  { date: "2024-04-09", spent: 59 },
-  { date: "2024-04-10", spent: 261 },
-  { date: "2024-04-11", spent: 327 },
-  { date: "2024-04-12", spent: 292 },
-  { date: "2024-04-13", spent: 342 },
-  { date: "2024-04-14", spent: 137 },
-  { date: "2024-04-15", spent: 120 },
-  { date: "2024-04-16", spent: 138 },
-  { date: "2024-04-17", spent: 446 },
-  { date: "2024-04-18", spent: 364 },
-  { date: "2024-04-19", spent: 243 },
-  { date: "2024-04-20", spent: 89 },
-  { date: "2024-04-21", spent: 137 },
-  { date: "2024-04-22", spent: 224 },
-  { date: "2024-04-23", spent: 138 },
-  { date: "2024-04-24", spent: 387 },
-  { date: "2024-04-25", spent: 215 },
-  { date: "2024-04-26", spent: 75 },
-  { date: "2024-04-27", spent: 383 },
-  { date: "2024-04-28", spent: 122 },
-  { date: "2024-04-29", spent: 315 },
-  { date: "2024-04-30", spent: 454 },
-  { date: "2024-05-01", spent: 165 },
-  { date: "2024-05-02", spent: 293 },
-  { date: "2024-05-03", spent: 247 },
-  { date: "2024-05-04", spent: 385 },
-  { date: "2024-05-05", spent: 481 },
-  { date: "2024-05-06", spent: 498 },
-  { date: "2024-05-07", spent: 388 },
-  { date: "2024-05-08", spent: 149 },
-  { date: "2024-05-09", spent: 227 },
-  { date: "2024-05-10", spent: 293 },
-  { date: "2024-05-11", spent: 335 },
-  { date: "2024-05-12", spent: 197 },
-  { date: "2024-05-13", spent: 197 },
-  { date: "2024-05-14", spent: 448 },
-  { date: "2024-05-15", spent: 473 },
-  { date: "2024-05-16", spent: 338 },
-  { date: "2024-05-17", spent: 499 },
-  { date: "2024-05-18", spent: 315 },
-  { date: "2024-05-19", spent: 235 },
-  { date: "2024-05-20", spent: 177 },
-  { date: "2024-05-21", spent: 82 },
-  { date: "2024-05-22", spent: 81 },
-  { date: "2024-05-23", spent: 252 },
-  { date: "2024-05-24", spent: 294 },
-  { date: "2024-05-25", spent: 201 },
-];
-
 const chartConfig = {
   visitors: {
     label: "Visitors",
@@ -98,10 +40,28 @@ const chartConfig = {
 
 export function TotalSpentChart() {
   const [timeRange, setTimeRange] = React.useState("90d");
+  const [chartData, setChartData] = React.useState<
+    { date: string; spent: number }[]
+  >([]);
+
+  // Fetch data on mount
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("/api/dashboard/daily-spending");
+        const result = await response.json();
+        setChartData(result.data || []);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const filteredData = chartData.filter((item) => {
     const date = new Date(item.date);
-    const referenceDate = new Date("2024-06-30");
+    const referenceDate = new Date();
     let daysToSubtract = 90;
     if (timeRange === "30d") {
       daysToSubtract = 30;

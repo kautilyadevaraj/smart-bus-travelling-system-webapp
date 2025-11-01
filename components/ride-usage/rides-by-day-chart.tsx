@@ -2,6 +2,7 @@
 
 import { TrendingUp } from "lucide-react";
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts";
+import * as React from "react";
 
 import {
   Card,
@@ -18,18 +19,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 
-export const description = "A radar chart with dots";
-
-const chartData = [
-  { day: "Mon", rides: 186 },
-  { day: "Tues", rides: 305 },
-  { day: "Wed", rides: 237 },
-  { day: "Thurs", rides: 273 },
-  { day: "Fri", rides: 209 },
-  { day: "Sat", rides: 214 },
-  { day: "Sun", rides: 214 },
-];
-
 const chartConfig = {
   rides: {
     label: "Rides",
@@ -38,13 +27,33 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function RidesByDayChart() {
+  const [chartData, setChartData] = React.useState<
+    { day: string; rides: number }[]
+  >([]);
+  const [mostActiveDay, setMostActiveDay] = React.useState("");
+  const [mostActiveDayCount, setMostActiveDayCount] = React.useState(0);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("/api/dashboard/rides-by-day");
+        const result = await response.json();
+        setChartData(result.data || []);
+        setMostActiveDay(result.summary?.mostActiveDay || "");
+        setMostActiveDayCount(result.summary?.mostActiveDayCount || 0);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   return (
     <Card>
       <CardHeader className="items-center">
         <CardTitle>Rides by Day of Week</CardTitle>
-        <CardDescription>
-          Showing rides on each day of the week
-        </CardDescription>
+        <CardDescription>Showing rides on each day of the week</CardDescription>
       </CardHeader>
       <CardContent className="pb-0">
         <ChartContainer
@@ -67,6 +76,13 @@ export function RidesByDayChart() {
           </RadarChart>
         </ChartContainer>
       </CardContent>
+      <CardFooter className="flex-col items-center gap-2 text-sm">
+        <div className="flex gap-2 font-medium leading-none">
+          Most active day:{" "}
+          <span className="text-blue-600">{mostActiveDay}</span>{" "}
+          <span className="text-gray-500">({mostActiveDayCount} rides)</span>
+        </div>
+      </CardFooter>
     </Card>
   );
 }

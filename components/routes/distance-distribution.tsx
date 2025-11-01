@@ -18,17 +18,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   ChartLegend,
-  ChartLegendContent
+  ChartLegendContent,
 } from "@/components/ui/chart";
-
-export const description = "A donut chart with text";
-
-const chartData = [
-  { dist: "0-5 km", rides: 35, fill: "var(--chart-1)" },
-  { dist: "5-10 km", rides: 45, fill: "var(--chart-2)" },
-  { dist: "10-15 km", rides: 15, fill: "var(--chart-3)" },
-  { dist: "15+ km", rides: 5, fill: "var(--chart-4)" },
-];
 
 const chartConfig = {
   rides: {
@@ -53,8 +44,28 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function DistanceDistribution() {
-  const totalVisitors = React.useMemo(() => {
+  const [chartData, setChartData] = React.useState<
+    { dist: string; rides: number; fill: string }[]
+  >([]);
+  const [mostCommonRange, setMostCommonRange] = React.useState("");
+
+  const totalRides = React.useMemo(() => {
     return chartData.reduce((acc, curr) => acc + curr.rides, 0);
+  }, [chartData]);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("/api/dashboard/distance-distribution");
+        const result = await response.json();
+        setChartData(result.data || []);
+        setMostCommonRange(result.summary?.mostCommonRange || "");
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
   }, []);
 
   return (
@@ -95,7 +106,7 @@ export function DistanceDistribution() {
                           y={viewBox.cy}
                           className="fill-foreground text-3xl font-bold"
                         >
-                          {totalVisitors.toLocaleString()}
+                          {totalRides.toLocaleString()}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
@@ -117,6 +128,12 @@ export function DistanceDistribution() {
           </PieChart>
         </ChartContainer>
       </CardContent>
+      <CardFooter className="flex-col items-center gap-2 text-sm">
+        <div className="flex gap-2 font-medium leading-none">
+          Most common:{" "}
+          <span className="text-purple-600">{mostCommonRange}</span>
+        </div>
+      </CardFooter>
     </Card>
   );
 }
