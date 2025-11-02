@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,7 +10,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-// Removed Spinner, will use Loader2 from lucide-react
 import {
   CreditCard,
   Check,
@@ -23,10 +22,9 @@ import {
   Wallet,
   ArrowUp,
   ArrowDown,
-  Loader2, // Added Loader2
+  Loader2,
 } from "lucide-react";
 
-// (Keep your Transaction interface and mock data here)
 interface Transaction {
   id: string;
   type: "ride" | "recharge";
@@ -44,61 +42,61 @@ export default function SmartCardPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   // --- REAL DATA ---
-  // We'll fetch the user's real card and balance
   const [linkedCard, setLinkedCard] = useState<string | null>(null);
   const [cardBalance, setCardBalance] = useState(0);
-  const [isPageLoading, setIsPageLoading] = useState(true); // Page load spinner
+  const [isPageLoading, setIsPageLoading] = useState(true); // For main card/balance
   const [status, setStatus] = useState("");
 
-  const [transactions] = useState<Transaction[]>([{
-    id: "1",
-    type: "ride",
-    amount: -45.5,
-    description: "Bus Route #12 - Downtown",
-    date: "Oct 25",
-    time: "09:30 AM",
-  },
-  {
-    id: "2",
-    type: "recharge",
-    amount: 500,
-    description: "Card Recharge",
-    date: "Oct 24",
-    time: "02:15 PM",
-  },
-  {
-    id: "3",
-    type: "ride",
-    amount: -32.0,
-    description: "Bus Route #5 - Airport",
-    date: "Oct 23",
-    time: "06:45 PM",
-  },
-  {
-    id: "4",
-    type: "ride",
-    amount: -28.75,
-    description: "Bus Route #8 - Station",
-    date: "Oct 22",
-    time: "08:20 AM",
-    },
-  ]); // You would fetch this too
-  const [rechargeAmount, setRechargeAmount] = useState(""); // Added this line
+  // --- NEW: Dynamic Transactions ---
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isTransactionsLoading, setIsTransactionsLoading] = useState(true);
+  const [rechargeAmount, setRechargeAmount] = useState("");
 
-  // --- FETCH USER DATA ON LOAD ---
-  // This simulates fetching the user's current card & balance
+  // --- FETCH ALL USER DATA ON LOAD ---
+  const fetchUserData = useCallback(
+    async (options?: { skipPageLoad?: boolean }) => {
+      if (!options?.skipPageLoad) {
+        setIsPageLoading(true);
+      }
+      setIsTransactionsLoading(true);
+
+      try {
+        // Fetch card profile and transactions in parallel
+        const [profileRes, transactionsRes] = await Promise.all([
+          fetch("/api/card-profile"),
+          fetch("/api/transactions"),
+        ]);
+
+        // Handle profile data
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          setLinkedCard(data.card_uid || null);
+          setCardBalance(Number.parseFloat(data.balance) || 0);
+        } else {
+          throw new Error("Failed to fetch user data");
+        }
+
+        // Handle transactions data
+        if (transactionsRes.ok) {
+          const data = await transactionsRes.json();
+          setTransactions(data);
+        } else {
+          throw new Error("Failed to fetch transactions");
+        }
+      } catch (error) {
+        console.error("Fetch user data error:", error);
+        setStatus("Error: Could not load card details.");
+      } finally {
+        setIsPageLoading(false);
+        setIsTransactionsLoading(false);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
-    const fetchUserData = async () => {
-      setIsPageLoading(true);
-      // TODO: Replace this with a real fetch to your user/profile API
-      // For now, we mock it.
-      await new Promise((resolve) => setTimeout(resolve, 750));
-      setLinkedCard("B3:9E:38:F6"); // Mock: user already has a card
-      setCardBalance(312.5);
-      setIsPageLoading(false);
-    };
     fetchUserData();
-  }, []);
+  }, [fetchUserData]);
 
   const startCardDetection = async () => {
     setStatus("Waiting... Please tap your card on the reader.");
@@ -106,7 +104,6 @@ export default function SmartCardPage() {
     setIsLoading(true);
 
     try {
-      // This API call is now fixed and will return a clean UID
       const response = await fetch("/api/card/detect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,7 +118,7 @@ export default function SmartCardPage() {
       }
 
       const data = await response.json();
-      setCardUID(data.cardUID); // This will be the clean UID
+      setCardUID(data.cardUID);
       setStatus(`Card ${data.cardUID} detected! Please verify.`);
       setIsLoading(false);
       setStep("verify");
@@ -133,13 +130,11 @@ export default function SmartCardPage() {
     }
   };
 
-  // --- !!! THIS FUNCTION IS NOW FIXED !!! ---
   const handleConfirmLink = async () => {
     setIsLoading(true);
     setStatus("Linking card to your account...");
 
     try {
-      // This is the REAL API call to your /api/register-card route
       const response = await fetch("/api/register-card", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,12 +144,13 @@ export default function SmartCardPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        // Show the user the error from the server (e.g., "Card already registered")
         throw new Error(data.error || "Failed to link card");
       }
 
-      // Success!
+      // Success! Update state from response
       setLinkedCard(data.card_uid);
+      setCardBalance(data.newBalance); // Will be 0
+      setTransactions([]); // New card has no transactions
       setStatus(`Success! Card ${data.card_uid} is now linked.`);
       setStep("success");
 
@@ -162,25 +158,51 @@ export default function SmartCardPage() {
         setStep("intro");
         setCardUID("");
         setStatus("");
+        // No need to re-fetch, we just set the state
       }, 3000);
     } catch (error: any) {
       console.error("Card linking error:", error.message);
       setStatus(`Error: ${error.message}`);
       setIsLoading(false);
-      // Don't reset step, let them see the error and retry
     }
   };
 
   const handleRecharge = async () => {
-    // (Your recharge logic here - this is still simulated)
-    if (!rechargeAmount || Number.parseFloat(rechargeAmount) <= 0) return;
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
     const amount = Number.parseFloat(rechargeAmount);
-    setCardBalance(cardBalance + amount);
-    setRechargeAmount("");
-    setStep("intro");
-    setIsLoading(false);
+    if (!amount || amount < 100) {
+      setStatus("Minimum recharge amount is ₹100.");
+      return;
+    }
+    setIsLoading(true);
+    setStatus("Processing recharge...");
+
+    try {
+      const response = await fetch("/api/card-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amount }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to process recharge");
+      }
+
+      // Success!
+      setRechargeAmount("");
+      setStep("intro");
+      setStatus(""); // Clear any error status
+
+      // Re-fetch profile and transactions to show new balance and tx
+      // Pass skipPageLoad to avoid full page spinner
+      await fetchUserData({ skipPageLoad: true });
+    } catch (error: any) {
+      console.error("Recharge error:", error.message);
+      setStatus(`Error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Show a spinner while the page is loading the user's data
@@ -272,12 +294,6 @@ export default function SmartCardPage() {
                         {linkedCard}
                       </p>
                     </div>
-                    {/* <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <Check className="w-5 h-5 text-green-500" />
-                      <p className="text-sm text-green-700 dark:text-green-400">
-                        Card successfully linked and active
-                      </p>
-                  . */}
                     <Button
                       onClick={startCardDetection}
                       variant="outline"
@@ -323,12 +339,21 @@ export default function SmartCardPage() {
                   </p>
                 </div>
                 <Button
-                  onClick={() => setStep("recharge")}
+                  onClick={() => {
+                    setStep("recharge");
+                    setStatus(""); // Clear any old errors
+                  }}
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+                  disabled={!linkedCard} // Disable if no card is linked
                 >
                   <Plus className="w-4 h-4" />
                   Add Money
                 </Button>
+                {!linkedCard && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Please link a card to add money.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -342,54 +367,64 @@ export default function SmartCardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {transactions.map((transaction) => (
-                  <div
-                    key={transaction.id}
-                    className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border hover:bg-muted/80 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              {isTransactionsLoading ? (
+                <div className="flex justify-center items-center h-40">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                </div>
+              ) : transactions.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {transactions.map((transaction) => (
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border hover:bg-muted/80 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            transaction.type === "ride"
+                              ? "bg-blue-500/10"
+                              : "bg-green-500/10"
+                          }`}
+                        >
+                          {transaction.type === "ride" ? (
+                            <ArrowDown
+                              className={`w-5 h-5 ${
+                                transaction.type === "ride"
+                                  ? "text-blue-500"
+                                  : "text-green-500"
+                              }`}
+                            />
+                          ) : (
+                            <ArrowUp className="w-5 h-5 text-green-500" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-card-foreground text-sm">
+                            {transaction.description}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {transaction.date} at {transaction.time}
+                          </p>
+                        </div>
+                      </div>
+                      <p
+                        className={`font-semibold text-sm ${
                           transaction.type === "ride"
-                            ? "bg-blue-500/10"
-                            : "bg-green-500/10"
+                            ? "text-red-500"
+                            : "text-green-500"
                         }`}
                       >
-                        {transaction.type === "ride" ? (
-                          <ArrowDown
-                            className={`w-5 h-5 ${
-                              transaction.type === "ride"
-                                ? "text-blue-500"
-                                : "text-green-500"
-                            }`}
-                          />
-                        ) : (
-                          <ArrowUp className="w-5 h-5 text-green-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-card-foreground text-sm">
-                          {transaction.description}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {transaction.date} at {transaction.time}
-                        </p>
-                      </div>
+                        {transaction.type === "ride" ? "-" : "+"}₹
+                        {Math.abs(transaction.amount).toFixed(2)}
+                      </p>
                     </div>
-                    <p
-                      className={`font-semibold text-sm ${
-                        transaction.type === "ride"
-                          ? "text-red-500"
-                          : "text-green-500"
-                      }`}
-                    >
-                      {transaction.type === "ride" ? "-" : "+"}₹
-                      {Math.abs(transaction.amount).toFixed(2)}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center p-4">
+                  No transactions yet.
+                </p>
+              )}
             </CardContent>
           </Card>
         </>
@@ -462,6 +497,16 @@ export default function SmartCardPage() {
               </p>
             </div>
 
+            {/* Show error status here */}
+            {status && !status.startsWith("Card") && (
+              <div className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-700 dark:text-red-400">
+                  {status}
+                </p>
+              </div>
+            )}
+
             <div className="space-y-3 p-4 bg-muted rounded-lg border border-border">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
@@ -470,8 +515,8 @@ export default function SmartCardPage() {
                     Please Confirm
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Make sure this is your smart card. You can only link one
-                    card at a time.
+                    Linking this card will replace any existing card and set its
+                    balance to ₹0.
                   </p>
                 </div>
               </div>
@@ -566,13 +611,23 @@ export default function SmartCardPage() {
                 onChange={(e) => setRechargeAmount(e.target.value)}
                 className="bg-muted border-border text-card-foreground placeholder:text-muted-foreground"
                 disabled={isLoading}
-                min="1"
+                min="100"
                 step="1"
               />
               <p className="text-xs text-muted-foreground">
                 Minimum recharge: ₹100
               </p>
             </div>
+
+            {/* Show error status here */}
+            {status && (
+              <div className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-700 dark:text-red-400">
+                  {status}
+                </p>
+              </div>
+            )}
 
             {/* Quick Amount Buttons */}
             <div className="grid grid-cols-3 gap-2">
@@ -594,6 +649,7 @@ export default function SmartCardPage() {
                 onClick={() => {
                   setStep("intro");
                   setRechargeAmount("");
+                  setStatus("");
                 }}
                 variant="outline"
                 className="flex-1 border-border text-foreground hover:bg-muted"
