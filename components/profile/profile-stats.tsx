@@ -15,14 +15,14 @@ export function ProfileStats({ user }: ProfileStatsProps) {
   const stats = [
     {
       label: "Current Balance",
-      value: `$${balance.toFixed(2)}`,
+      value: `₹${balance.toFixed(2)}`,
       icon: Wallet,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-100 dark:bg-blue-900/30",
     },
     {
       label: "Total Spent",
-      value: `$${totalSpent.toFixed(2)}`,
+      value: `₹${totalSpent.toFixed(2)}`,
       icon: TrendingUp,
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-100 dark:bg-purple-900/30",

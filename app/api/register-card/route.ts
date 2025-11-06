@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const [existingUser] = await db
       .select()
       .from(users)
-      .where(eq(users.id, user.id));
+      .where(eq(users.email, user.email!));
 
     if (!existingUser) {
       await db.insert(users).values({
