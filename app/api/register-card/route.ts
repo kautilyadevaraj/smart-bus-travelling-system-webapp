@@ -22,15 +22,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // --- NEW FIX: Clean the incoming data ---
-  // The raw data from the pin is "B3:9E:38:F6ENTRY0.0000000.000000" + a null byte.
-
-  // 1. Remove the null byte (0x00) that causes the 'invalid byte sequence' error.
+  // Clean the incoming data
   const cleaned_string = garbled_uid.replace(/\0/g, "");
 
-  // 2. Extract just the card UID (e.g., "B3:9E:38:F6") from the string.
-  // --- THIS REGEX IS NOW FIXED ---
-  // It looks for a 4-byte (XX:XX:XX:XX) or 7-byte (XX:XX:XX:XX:XX:XX:XX) pattern at the start.
   const uidRegex =
     /^((?:[0-9A-F]{2}:){3}[0-9A-F]{2}|(?:[0-9A-F]{2}:){6}[0-9A-F]{2})/i;
   const match = cleaned_string.match(uidRegex);
@@ -45,9 +39,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // This is the clean, final Card UID
   const final_card_uid = match[0].toUpperCase();
-  // --- END OF FIX ---
 
   try {
     const [existingUser] = await db
@@ -55,21 +47,34 @@ export async function POST(request: Request) {
       .from(users)
       .where(eq(users.email, user.email!));
 
+    let userBalance = 0; // Default balance for new users
+
     if (!existingUser) {
+      // New user - insert with default balance
       await db.insert(users).values({
         id: user.id,
         email: user.email!,
         name: user.user_metadata?.name || "New User",
-        card_uid: final_card_uid, // Use the clean UID
+        card_uid: final_card_uid,
+        balance: "0", // String as per your schema (numeric type)
       });
+      userBalance = 0;
     } else {
+      // Existing user - update card_uid and get their current balance
       await db
         .update(users)
-        .set({ card_uid: final_card_uid }) // Use the clean UID
+        .set({ card_uid: final_card_uid })
         .where(eq(users.id, user.id));
+
+      // ✅ FIX: Parse the balance correctly (it's a string/numeric in DB)
+      userBalance = parseFloat(existingUser.balance as string) || 0;
     }
 
-    return NextResponse.json({ success: true, card_uid: final_card_uid, newBalance: existingUser.balance });
+    return NextResponse.json({
+      success: true,
+      card_uid: final_card_uid,
+      balance: userBalance, // ✅ Return as plain number
+    });
   } catch (error: any) {
     if (
       error.code === "23505" ||
