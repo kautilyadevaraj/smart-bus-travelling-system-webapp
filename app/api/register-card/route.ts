@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         .where(eq(users.id, user.id));
     }
 
-    return NextResponse.json({ success: true, card_uid: final_card_uid });
+    return NextResponse.json({ success: true, card_uid: final_card_uid, newBalance: existingUser.balance });
   } catch (error: any) {
     if (
       error.code === "23505" ||
