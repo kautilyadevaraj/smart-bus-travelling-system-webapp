@@ -149,7 +149,7 @@ export default function SmartCardPage() {
 
       // Success! Update state from response
       setLinkedCard(data.card_uid);
-      setCardBalance(data.newBalance); // Will be 0
+      setCardBalance(0); // Will be 0
       setTransactions([]); // New card has no transactions
       setStatus(`Success! Card ${data.card_uid} is now linked.`);
       setStep("success");
