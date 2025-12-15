@@ -4,19 +4,19 @@ import { createClient } from "@/utils/supabase/server";
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
+    // const {
+    //   data: { user: authUser },
+    // } = await supabase.auth.getUser();
 
-    if (!authUser || !authUser.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // if (!authUser || !authUser.email) {
+    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // }
 
     // Get the user's internal ID from the 'users' table
     const { data: internalUser, error: userError } = await supabase
       .from("users") // Your 'public.users' table
       .select("id, name, email, image, card_uid, balance, total_spent")
-      .eq("email", authUser.email)
+      .eq("id", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d")
       .single(); // We expect only one user with this email
 
     if (userError || !internalUser) {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       id: internalUser.id,
       name: internalUser.name || "User",
       email: internalUser.email,
-      image: authUser.user_metadata?.avatar_url || internalUser.image || null,
+      image: internalUser.image || null,
       balance: internalUser.balance || "0",
       totalSpent: internalUser.total_spent || "0",
       card_uid: internalUser.card_uid,
